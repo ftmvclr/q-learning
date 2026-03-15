@@ -67,6 +67,7 @@ int main(){
 			break; // woo
 			} */
 		}
+	// TODO we are supposed to decay the epsilon over time!!
 }
 
 Action takeAction(AgentPtr truck){
@@ -126,7 +127,7 @@ int updateParticularState(AgentPtr truck, Action action){
 		landing = landNext(row, col, loaded, action, truck);
 		if(landing == NULL){
 			reward = -100;
-			*landing = *cur;
+			landing = cur;
 		}
 		else
 			reward = -1;
@@ -140,7 +141,7 @@ int updateParticularState(AgentPtr truck, Action action){
 	else if(action == UNLOAD && atUnloadPosition(row, col) && loaded == 1){ // winning move btw
 		loaded = 0;
 		landing = &state[row * 10 + col][0][UNLOAD];
-		reward = INT_MAX;
+		reward = 1000;
 		*cur = *cur + alpha * (reward + gamma * *landing - *cur);
 		return 1;
 	}
