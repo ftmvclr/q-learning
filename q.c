@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <limits.h>
 
 typedef enum {LEFT, RIGHT, UP, DOWN, LOAD, UNLOAD} Action;
 const double gamma = 0.95; // curiosity coefficient
@@ -29,9 +30,11 @@ UnloadCoords plc = {9, 9};
 
 double state[100][2][6] = {0.0}; // 10x10 map, loaded vs unloaded (2), 6 actions
 
-void updateParticularState(AgentPtr truck, Action action);
+Action takeAction(AgentPtr truck);
 int atLoadPosition(int row, int col);
 int atUnloadPosition(int row, int col);
+int updateParticularState(AgentPtr truck, Action action);
+double *landNext(int row, int col, int loaded, Action action, AgentPtr truck);
 
 int main(){
 	srand(time(NULL));
@@ -41,21 +44,29 @@ int main(){
 		return 1;
 
 	truck1->locRow = 0; truck1->locCol = 9;
-	
+	Action tempAct = -1;
 	int minTrials = 1000;
 	int trialCount = 0;
 	int bool_converged = 0;
-	// !!!!!! call stateupdater thing with truck1
-//	for(; trialCount <= minTrials && !bool_converged; trialCount++){
-//		while(){ // continue until loaded successfully
-//			first take an action (call the randomizer)
-//			idk how to implement reward thing yet
-//			then update that state
-//			if action = not load or unload(less than 4 or smth) steps++
-// 	    }
+	int steps = 0;
+	int bool_won = 0;
+	while(trialCount <= minTrials && !bool_converged){
+		steps = 0;
+		while(1){ // continue until loaded successfully
+			tempAct = takeAction(truck1);
+			bool_won = updateParticularState(truck1, tempAct);
+			if(tempAct != LOAD && tempAct != UNLOAD)
+				steps++;
+			if(bool_won)
+				break;
+		}
+		trialCount++;
 // 	    if less than mintrial don't send to "did it converge?" function
-//	    else do send it, check return value
-// }
+/*		if(trialCount > minTrials)
+			if(didItConverge()){
+			break; // woo
+			} */
+		}
 }
 
 Action takeAction(AgentPtr truck){
@@ -80,10 +91,6 @@ Action takeAction(AgentPtr truck){
 	return action;
 }
 
-double judge(int row, int col, int loaded){
-	return 0; // dummy
-}
-
 /*returns the address for where the movement based actions lead*/
 double *landNext(int row, int col, int loaded, Action action, AgentPtr truck){
 	if(action == LEFT && col != 0){
@@ -91,11 +98,11 @@ double *landNext(int row, int col, int loaded, Action action, AgentPtr truck){
 		return &state[row * 10 + col - 1][loaded][LEFT];
 	}
 	else if(action == RIGHT && col != 9){
-		truck->locCol = col - 1;
+		truck->locCol = col + 1;
 		return &state[row * 10 + col + 1][loaded][RIGHT];
 	}
 	else if(action == UP && row != 0){
-		truck->locRow = row - 1;
+		truck->locRow = row + 1;
 		return &state[(row + 1) * 10 + col][loaded][UP];
 	}	
 	else if(action == DOWN && row != 9){
@@ -103,11 +110,11 @@ double *landNext(int row, int col, int loaded, Action action, AgentPtr truck){
 		return &state[(row - 1) * 10 + col][loaded][DOWN];
 	}
 	else{ // out of bounds, stay where you are
-		return &state[row * 10 + col][loaded][action];
+		return NULL;
 	}
 }
 
-void updateParticularState(AgentPtr truck, Action action){
+int updateParticularState(AgentPtr truck, Action action){
 	int row = truck->locRow;
 	int col = truck->locCol;
 	int loaded = truck->loaded;
@@ -117,7 +124,12 @@ void updateParticularState(AgentPtr truck, Action action){
 
 	if(action != LOAD && action != UNLOAD){// moving
 		landing = landNext(row, col, loaded, action, truck);
-		reward = -1;
+		if(landing == NULL){
+			reward = -100;
+			*landing = *cur;
+		}
+		else
+			reward = -1;
 	}
 	else if(action == LOAD && atLoadPosition(row, col) && loaded == 0){
 		landing = &state[row * 10 + col][1][LOAD];
@@ -129,6 +141,8 @@ void updateParticularState(AgentPtr truck, Action action){
 		loaded = 0;
 		landing = &state[row * 10 + col][0][UNLOAD];
 		reward = INT_MAX;
+		*cur = *cur + alpha * (reward + gamma * *landing - *cur);
+		return 1;
 	}
 	else{ // invalid load & unload.
 		reward = -50;
@@ -137,7 +151,7 @@ void updateParticularState(AgentPtr truck, Action action){
 
 	// make sure to update the truck struct's positions
 	truck->loaded = loaded;
-	// TODO row col, div mod 
+	return 0;
 }
 
 /*checks the coordinates and returns bool whether we are at load or no*/
