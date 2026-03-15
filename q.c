@@ -6,7 +6,7 @@
 typedef enum {LEFT, RIGHT, UP, DOWN, LOAD, UNLOAD} Action;
 const double gamma = 0.95; // curiosity coefficient
 double epsilon = 0.8; // epsilon-greedy thing exploration vs exploitation
-double omEpsilon = 0.2; // One Minus Epsilon
+/*picked final epsilon to be 0.1 approximately 0.014 decay at each 100 steps*/
 const double alpha = 0.1; // learning coefficient
 
 typedef struct{ // current state of the truck
@@ -29,7 +29,7 @@ PickupCoords obj = {4, 0};
 UnloadCoords plc = {9, 9};
 
 double state[100][2][6] = {0.0}; // 10x10 map, loaded vs unloaded (2), 6 actions
-
+int trialSteps[5000] = {0};
 Action takeAction(AgentPtr truck);
 int atLoadPosition(int row, int col);
 int atUnloadPosition(int row, int col);
@@ -42,7 +42,6 @@ int main(){
 	AgentPtr truck1 = calloc(1, sizeof(Agent));
 	if(truck1 == NULL)
 		return 1;
-
 	truck1->locRow = 0; truck1->locCol = 9;
 	Action tempAct = -1;
 	int minTrials = 1000;
@@ -50,8 +49,9 @@ int main(){
 	int bool_converged = 0;
 	int steps = 0;
 	int bool_won = 0;
-	while(trialCount <= minTrials && !bool_converged){
+	while(trialCount < 5000){
 		steps = 0;
+		truck1->locCol = 9; truck1->locRow = 0; truck1->loaded = 0;
 		while(1){ // continue until loaded successfully
 			tempAct = takeAction(truck1);
 			bool_won = updateParticularState(truck1, tempAct);
@@ -60,14 +60,13 @@ int main(){
 			if(bool_won)
 				break;
 		}
-		trialCount++;
-// 	    if less than mintrial don't send to "did it converge?" function
-/*		if(trialCount > minTrials)
-			if(didItConverge()){
-			break; // woo
-			} */
+		trialSteps[trialCount++] = steps;
+		if(trialCount % 100 == 0){
+			epsilon -= 0.014;
 		}
+	}
 	// TODO we are supposed to decay the epsilon over time!!
+	free(truck1);
 }
 
 Action takeAction(AgentPtr truck){
@@ -103,12 +102,12 @@ double *landNext(int row, int col, int loaded, Action action, AgentPtr truck){
 		return &state[row * 10 + col + 1][loaded][RIGHT];
 	}
 	else if(action == UP && row != 0){
-		truck->locRow = row + 1;
-		return &state[(row + 1) * 10 + col][loaded][UP];
+		truck->locRow = row - 1;
+		return &state[(row - 1) * 10 + col][loaded][UP];
 	}	
 	else if(action == DOWN && row != 9){
-		truck->locRow = row - 1;
-		return &state[(row - 1) * 10 + col][loaded][DOWN];
+		truck->locRow = row + 1;
+		return &state[(row + 1) * 10 + col][loaded][DOWN];
 	}
 	else{ // out of bounds, stay where you are
 		return NULL;
@@ -143,14 +142,19 @@ int updateParticularState(AgentPtr truck, Action action){
 		landing = &state[row * 10 + col][0][UNLOAD];
 		reward = 1000;
 		*cur = *cur + alpha * (reward + gamma * *landing - *cur);
+		truck->loaded = 0;
 		return 1;
 	}
 	else{ // invalid load & unload.
 		reward = -50;
 	}
-	*cur = *cur + alpha * (reward + gamma * *landing - *cur);
-
-	// make sure to update the truck struct's positions
+	// !! truck got updated up until this point
+	double bestNext = state[truck->locRow * 10 + truck->locCol][truck->loaded][0];;
+	for(int i = 0; i < 6; i++){ 
+		if(state[truck->locRow * 10 + truck->locCol][truck->loaded][i] > bestNext)
+			bestNext = state[truck->locRow * 10 + truck->locCol][truck->loaded][i];
+	}
+	*cur = *cur + alpha * (reward + gamma * bestNext - *cur);
 	truck->loaded = loaded;
 	return 0;
 }
