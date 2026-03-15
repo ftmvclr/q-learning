@@ -6,7 +6,6 @@
 typedef enum {LEFT, RIGHT, UP, DOWN, LOAD, UNLOAD} Action;
 const double gamma = 0.95; // curiosity coefficient
 double epsilon = 0.8; // epsilon-greedy thing exploration vs exploitation
-/*picked final epsilon to be 0.1 approximately 0.014 decay at each 100 steps*/
 const double alpha = 0.1; // learning coefficient
 
 typedef struct{ // current state of the truck
@@ -35,6 +34,7 @@ int atLoadPosition(int row, int col);
 int atUnloadPosition(int row, int col);
 int updateParticularState(AgentPtr truck, Action action);
 double *landNext(int row, int col, int loaded, Action action, AgentPtr truck);
+void printStepCounts();
 
 int main(){
 	srand(time(NULL));
@@ -62,11 +62,11 @@ int main(){
 		}
 		trialSteps[trialCount++] = steps;
 		if(trialCount % 100 == 0){
-			epsilon -= 0.014;
+			epsilon -= 0.018;
 		}
 	}
-	// TODO we are supposed to decay the epsilon over time!!
 	free(truck1);
+	printStepCounts();
 }
 
 Action takeAction(AgentPtr truck){
@@ -78,7 +78,7 @@ Action takeAction(AgentPtr truck){
 	if(r < epsilon) {
 		action = rand() % 6;
 	}
-	else { // take the best action at this position TODO
+	else { // take the best action at this position
 		double *q_wo_action = state[row * 10 + col][loaded]; // q  wihtout action
 		best = q_wo_action[0]; action = 0;
 		for(int i = 1; i < 6; i++){
@@ -165,5 +165,12 @@ int atLoadPosition(int row, int col){
 }
 
 int atUnloadPosition(int row, int col){
-	return (row == plc.locRow && col == plc.locCol); // dummy
+	return (row == plc.locRow && col == plc.locCol); 
+}
+
+void printStepCounts(){
+	int i;
+	for(i = 0; i < 5000; i++){
+		printf("Episode %d steps: %d\n", i, trialSteps[i]);
+	}
 }
